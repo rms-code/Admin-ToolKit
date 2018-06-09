@@ -1,0 +1,426 @@
+#####Vars
+$exserv = $Textbox9.Text
+
+#####
+$buttonClear_Click= {
+	$textbox1.Text = $null
+	$textbox2.Text = $null
+	$textbox3.Text = $null
+	$richtextbox1.Text = $null
+	$checkboxEnableAccount.Checked = $null
+	$checkboxLyncServerCredsWillP.Checked = $null
+	$checkboxMailboxServerCredsWi.Checked = $null
+	$textbox5.Text = $null
+	$richtextbox1.Text = $null
+	for ($i = 0; $i -lt $checkedlistbox1.Items.Count; $i++) {$checkedlistbox1.SetItemChecked($i,$false)}
+}
+
+$buttonQuit_Click={
+	$formAdminToolkit.Close()
+}
+function Load-ListBox
+{
+	Param (
+		[ValidateNotNull()]
+		[Parameter(Mandatory = $true)]
+		[System.Windows.Forms.ListBox]$ListBox,
+		[ValidateNotNull()]
+		[Parameter(Mandatory = $true)]
+		$Items,
+		[Parameter(Mandatory = $false)]
+		[string]$DisplayMember,
+		[switch]$Append
+	)
+	
+	if (-not $Append)
+	{
+		$listBox.Items.Clear()
+	}
+	
+	if ($Items -is [System.Windows.Forms.ListBox+ObjectCollection])
+	{
+		$listBox.Items.AddRange($Items)
+	}
+	elseif ($Items -is [Array])
+	{
+		$listBox.BeginUpdate()
+		foreach ($obj in $Items)
+		{
+			$listBox.Items.Add($obj)
+		}
+		$listBox.EndUpdate()
+	}
+	else
+	{
+		$listBox.Items.Add($Items)
+	}
+	
+	$listBox.DisplayMember = $DisplayMember
+}
+function Load-ComboBox
+{
+	Param (
+		[ValidateNotNull()]
+		[Parameter(Mandatory = $true)]
+		[System.Windows.Forms.ComboBox]$ComboBox,
+		[ValidateNotNull()]
+		[Parameter(Mandatory = $true)]
+		$Items,
+		[Parameter(Mandatory = $false)]
+		[string]$DisplayMember,
+		[switch]$Append
+	)
+	
+	if (-not $Append)
+	{
+		$ComboBox.Items.Clear()
+	}
+	
+	if ($Items -is [Object[]])
+	{
+		$ComboBox.Items.AddRange($Items)
+	}
+	elseif ($Items -is [Array])
+	{
+		$ComboBox.BeginUpdate()
+		foreach ($obj in $Items)
+		{
+			$ComboBox.Items.Add($obj)
+		}
+		$ComboBox.EndUpdate()
+	}
+	else
+	{
+		$ComboBox.Items.Add($Items)
+	}
+	
+	$ComboBox.DisplayMember = $DisplayMember
+}
+#CHANGE THE SEARCH BASE!
+Load-ComboBox -ComboBox $combobox1 (Get-ADOrganizationalUnit -SearchBase 'OU=,OU=,DC=,DC=' -filter *).Name
+$combobox1.SelectedIndex = 0
+#CHANGE THE AD GROUP!
+Load-ListBox -ListBox $checkedlistbox1 (Get-ADGroup -SearchBase 'OU=,OU=,DC=,DC=' -filter *).Name
+$combobox1.SelectedIndex = 0
+
+$buttonCreate_Click= {
+	$selectOU = $combobox1.Text
+	#CHANGE THE SEARCH BASE!
+	$myOU = Invoke-Expression "(Get-ADOrganizationalUnit -LDAPFilter '(Name=$selectOU)' -SearchBase 'OU=,OU=,DC=,DC=').DistinguishedName"
+	$myUPN = $textbox3.Text
+	$richtextbox1.Text += "`n" + $boxfirst.Text + ":`t" + $textbox1.Text + "`n"
+	$richtextbox1.Text += $boxlast.Text + ":`t" + $textbox2.Text + "`n"
+	$richtextbox1.Text += $groupbox2.Text + ":`t" + $textbox5.Text + "`n"
+	$richtextbox1.Text += $grpboxlogon.Text + ":`t" + $textbox3.Text + "`n"
+	$richtextbox1.Text += $groupbox1.Text + ":`t" + $combobox1.Text + "`n"
+	$richtextbox1.Text += $grpboxgroups.Text + ":`t" + $checkedlistbox1.CheckedItems + "`n"
+	if ($checkboxMailboxServerCredsWi.Checked -eq $true) { $richtextbox1.Text += $checkboxMailboxServerCredsWi.Text + ":`t" + "True" + "`n" }
+	else { $richtextbox1.Text += $checkboxMailboxServerCredsWi.Text + ":`t" + "False" + "`n" }
+	if ($checkboxLyncServerCredsWillP.Checked -eq $true) { $richtextbox1.Text += $checkboxLyncServerCredsWillP.Text + ":`t" + "True" + "`n" }
+	else { $richtextbox1.Text += $checkboxLyncServerCredsWillP.Text + ":`t" + "False" + "`n`n" }
+	
+	if ($checkboxEnableAccount.Checked -eq $true)
+	{
+		try
+		{
+			New-ADUser -Path $myOU -Name $textbox5.Text -DisplayName $textbox5.Text -Surname $textbox2.Text -GivenName $textbox1.Text -UserPrincipalName "$myUPN@contoso.ca" -AccountPassword (ConvertTo-SecureString "P@ss@@$w0rd34156" -AsPlainText -force) -SamAccountName $textbox3.Text -Enabled:$true
+			Add-ADPrincipalGroupMembership -Identity $textbox3.Text -MemberOf $checkedlistbox1.CheckedItems
+			$richtextbox1.Text += "User added and enabled`n"
+		}
+		catch { $richtextbox1.Text += "`nUser was not added, error was $_" }
+	}
+	
+	else
+	{
+		try
+		{
+			New-ADUser -Path $myOU -Name $textbox5.Text -DisplayName $textbox5.Text -Surname $textbox2.Text -GivenName $textbox1.Text -UserPrincipalName "$myUPN@contoso.ca" -AccountPassword (ConvertTo-SecureString "P@ss@@$w0rd34156" -AsPlainText -force) -SamAccountName $textbox3.Text -Enabled:$false
+			Add-ADPrincipalGroupMembership -Identity $textbox3.Text -MemberOf $checkedlistbox1.CheckedItems
+			$richtextbox1.Text += "`nUser added but disabled"
+		}
+		catch { $richtextbox1.Text += "`nUser was not added, error was $_" }
+	}
+	
+	if ($checkboxMailboxServerCredsWi.Checked -eq $true)
+	{
+			$exserv = $textbox9.text
+			$logon = $textbox3.Text
+			$AdminLogon = (Get-Credential)
+			$ExSession = New-PSSession –ConfigurationName Microsoft.Exchange –ConnectionUri 'http://$exserv/PowerShell/?SerializationLevel=Full' -Credential $AdminLogon –Authentication Kerberos
+			Import-PSSession $ExSession
+			#CHANGE DATABASE NAME
+			Enable-Mailbox "$logon@contoso.ca" -Database "DATABASENAME"
+		
+		$ExcUser = Get-Mailbox -identity "$logon"
+		if ($ExcUser.IsValid -eq $true)
+		{
+			$richtextbox1.Text += "`nEXCHANGE USER SUCCESSFULLY ENABLED"
+		}
+		elseif ($ExcUser.IsValid -eq $false)
+		{
+			$richtextbox1.Text += "`nEXCHANGE USER ERROR ENABLING, CHECK MANUALLY"
+		}
+		Remove-PSSession $ExSession
+	}
+	
+	if ($checkboxLyncServerCredsWillP.Checked -eq $true)
+	{
+			$lyncserv = $textbox8.text
+			$ident = $textbox3.Text
+			$AdminLogon = (Get-Credential)
+			$lyncoptions = New-PSSessionOption -SkipCACheck:$true -SkipCNCheck:$true -SkipRevocationCheck
+			$lyncsession = New-PSSession -ConnectionUri 'https://$lyncserv/ocspowershell' -Credential $AdminLogon -Authentication Default -SessionOption $lyncoptions
+			Import-PSSession $lyncsession
+			Enable-CsUser -Identity $textbox5.Text -RegistrarPool $lyncserv -SipAddress "sip:$logon@contoso.ca"
+		
+		$LYNCUser = Get-CsUser -identity "$ident"
+		if ($LYNCUser.Enabled -eq $true)
+		{
+			$richtextbox1.Text += "`nLYNC USER SUCCESSFULLY ENABLED"
+		}
+		elseif ($LYNCUser.Enabled -eq $false)
+		{
+			$richtextbox1.Text += "`nLYNC USER ERROR ENABLING, CHECK MANUALLY"
+		}
+		Remove-PSSession $lyncsession
+	}
+}
+
+$button1check_Click={
+
+	$username2 = $textbox6.Text
+	$userdata = Get-ADUser -filter { Name -like $username2 } -Properties LockedOut, Department, mail, passwordlastset | Select @{ n = "Login"; e = { $_.SamAccountName } }, Name, Enabled, Lockedout, Department, mail, passwordlastset | Format-List Login, Name, Enabled, Lockedout, Department, mail, passwordlastset | Out-String
+	$richtextbox3.AppendText($userdata)
+	
+	$username = $textbox6.Text
+	$userget = (Get-ADUser -filter { Name -like $username } | select samaccountname)
+	foreach ($usergetting in $userget)
+	{
+		$checkedlistbox2.Items.add($usergetting.samaccountname)
+	}
+}
+
+$buttonDisableAccount_Click={
+	$disableuser = $checkedlistbox2.CheckedItems
+	foreach ($item in $disableuser)
+	{
+		Get-ADUser -filter { samaccountname -eq $item } | Disable-ADAccount
+	}
+}
+
+$buttonDeleteAccount_Click={
+	$deleteuser = $checkedlistbox2.CheckedItems
+	foreach ($item2 in $deleteuser)
+	{
+		Get-ADUser -filter { samaccountname -eq $item2 } | Remove-ADUser
+	}
+}
+
+$button2_Click={
+	$unlockuser = $checkedlistbox2.CheckedItems
+	foreach ($item3 in $unlockuser)
+	{
+		Get-ADUser -filter { samaccountname -eq $item3 } | Unlock-ADAccount
+	}
+}
+
+$button3_Click={
+	$richtextbox3.Text = $null
+	$checkedlistbox2.Items.Clear()
+}
+
+$buttonEnableAccount_Click={
+	$enableuser = $checkedlistbox2.CheckedItems
+	foreach ($item4 in $enableuser)
+	{
+		Get-ADUser -filter { samaccountname -eq $item4 } | Enable-ADAccount
+	}
+}
+
+$buttonTempDisable_Click ={
+	$group = Get-ADGroup "Disabled Users" -Properties @("primaryGroupToken")
+	$disableuser2 = $checkedlistbox2.CheckedItems
+	foreach ($item5 in $disableuser2)
+	{
+		#Make Disabled Users OU, CHANGE TARGETPATHS!
+		Get-ADUser -filter { samaccountname -eq $item5 } | Disable-ADAccount
+		Get-ADUser -filter { samaccountname -eq $item5 } | Add-ADPrincipalGroupMembership -MemberOf "Disabled Users"
+		Get-ADUser -filter { samaccountname -eq $item5 } | Move-ADObject -TargetPath "OU=Disabled Users,OU=Users,OU=,DC=,DC="
+		Get-ADUser -Filter { samaccountname -eq $item5 } | Set-ADUser -Replace @{ primaryGroupID = $group.primaryGroupToken }
+		#CHANGE SEARCHBASE!
+		get-adgroup -SearchBase 'OU=,DC=,DC=' -filter * | ?{ $_.DistinguishedName -notmatch "Disabled Users" } | Remove-ADGroupMember -Members $item5
+	}
+	if ([System.Windows.Forms.MessageBox]::Show("Forward to mailbox?", "Mailbox Forward", [System.Windows.Forms.MessageBoxButtons]::YesNo) -eq "YES")
+	{
+		$mbforward = Read-Host -Prompt "Enter Mailbox to forward to"
+		$username = $checkedlistbox2.Text
+		$exserv = $textbox9.text
+		foreach ($item in $username)
+		{
+			$ExSession = New-PSSession –ConfigurationName Microsoft.Exchange –ConnectionUri 'http://$exserv.contoso.ca/PowerShell/?SerializationLevel=Full' -Credential $AdminLogon –Authentication Kerberos
+			Import-PSSession $ExSession
+			Set-Mailbox -Identity $item -ForwardingSmtpAddress $mbforward -DeliverToMailboxAndForward $false
+			Remove-PSSession $ExSession
+		}
+	}
+	elseif ([System.Windows.Forms.MessageBox]::Show("Give Mailbox Access?", "Mailbox Access", [System.Windows.Forms.MessageBoxButtons]::YesNo) -eq "YES")
+	{
+		$exserv = $textbox9.text
+		$username = $checkedlistbox2.Text
+		$mbaccess = Read-Host -Prompt "Enter Mailbox to give full access to"
+		$ExSession = New-PSSession –ConfigurationName Microsoft.Exchange –ConnectionUri 'http://$exserv/PowerShell/?SerializationLevel=Full' -Credential $AdminLogon –Authentication Kerberos
+		Import-PSSession $ExSession
+		Get-mailbox -identity "$username" | add-MailboxPermission -AccessRights Fullaccess -User "$mbaccess"
+		Remove-PSSession $ExSession
+	}
+	elseif ([System.Windows.Forms.MessageBox]::Show("Change User Desciption?", "User Description", [System.Windows.Forms.MessageBoxButtons]::YesNo) -eq "YES")
+	{
+		$username = $checkedlistbox2.Text
+		$aduserdes = Read-Host -Prompt "Enter Description for disabled user"
+		Get-ADUser -filter { samaccountname -eq $username } -Properties Description | Set-ADUser -Description "$aduserdes"
+	}
+	[void][System.Windows.Forms.MessageBox]::Show('Completed', 'Completed')
+}
+$checkboxEnableAccount_CheckedChanged={
+	
+}
+
+$checkboxLyncServerCredsWillP_CheckedChanged={
+	
+}
+
+$checkboxMailboxServerCredsWi_CheckedChanged={
+	
+}
+
+$textbox1_TextChanged={
+	
+}
+
+$grpboxuserinfo_Enter={
+	
+}
+
+$checkedlistbox2_SelectedIndexChanged={
+	
+}
+
+$textbox6_TextChanged={
+	
+}
+
+$ADCreation_SelectedIndexChanged={
+	
+}
+
+$formAdminToolkit_Load={
+	
+}
+
+$buttonAbout_Click={
+	[void][System.Windows.Forms.MessageBox]::Show('AD/Mail Tools Created by RMS.', 'About') 
+}
+
+$textbox5_TextChanged={
+	
+}
+
+$groupbox4_Enter={
+	
+}
+
+$tabpage3_Click={
+	
+}
+
+$buttonRemoveEmailFromALLMa_Click = {
+	$exserv = $textbox9.text
+	$ex3 = New-PSSession -ConnectionUri http://$exserv/powershell -ConfigurationName Microsoft.Exchange
+	Import-PSSession $ex3 -WarningAction SilentlyContinue
+	$subj = $textbox11.Text
+	$fromemail = $textbox10.Text
+	#UPDATE OU
+	$c1 = get-mailbox -OrganizationalUnit "contoso.ca/SOMEOU" | Search-Mailbox -SearchQuery subject:$subj, from:$fromemail -DeleteContent -Force | Where { $_.ResultItemsCount -ge 1 } | Out-String
+	$richtextbox5.AppendText($c1)
+	Remove-PSSession $ex3
+}
+
+$buttonRemoveFromUserAccoun_Click = {
+	$exserv = $Textbox9.Text
+	$ex6 = New-PSSession -ConnectionUri http://$exserv/powershell -ConfigurationName Microsoft.Exchange
+	Import-PSSession $ex6 -WarningAction SilentlyContinue
+	$useracc = $textbox13.Text
+	$subj = $textbox11.Text
+	$fromemail = $textbox10.Text
+	$c1 = Get-Mailbox -Identity $useracc | Search-Mailbox -SearchQuery subject:$subj, from:$fromemail -DeleteContent -Force | Where { $_.ResultItemsCount -ge 1 } | Out-String
+	$richtextbox5.AppendText($c1)
+	Remove-PSSession $ex6
+}
+ 
+$button1_Click={
+	$textbox13.Text = $null
+	$textbox11.Text = $null
+	$textbox10.Text = $null
+	$textbox12.text = $null
+	$richtextbox5.Text = $null
+}
+
+$buttonRemoveEmailFromOU_Click = {
+	$exserv = $textbox9.text
+	$ex3 = New-PSSession -ConnectionUri http://$exserv/powershell -ConfigurationName Microsoft.Exchange
+	Import-PSSession $ex3 -WarningAction SilentlyContinue
+	$ouacc = $textbox12.Text
+	$subj = $textbox11.Text
+	$fromemail = $textbox10.Text
+	$c1 = Get-Mailbox -OrganizationalUnit $ouacc | Search-Mailbox -SearchQuery subject:$subj, from:$fromemail -DeleteContent -Force | Where { $_.ResultItemsCount -ge 1 } | Out-String
+	$richtextbox5.AppendText($c1)
+	Remove-PSSession $ex3
+}
+
+$buttonGetOUs_Click = {
+	#CHANGE SEARCHBASE!
+	$a = Get-ADOrganizationalUnit -SearchBase "OU=Computers,OU=,DC=,DC=" -Filter *
+	$getou = $a
+	foreach ($ous in $getou)
+	{
+		$checkedlistbox3.Items.add($ous.DistinguishedName)
+	}
+}
+
+$buttonMoveToDefaultCompute_Click={
+	$getcreds = Get-Credential
+	$compname = $textbox14.Text
+	#CHANGE PATH!
+	Get-ADComputer $compname | Move-ADObject -TargetPath 'CN=Computers,DC=,DC=' -Credential $getcreds
+	$richtextbox6.Text = Get-ADComputer $compname
+}
+
+$buttonMovePC_Click = {
+	$getcreds = Get-Credential
+	$compname = $textbox14.Text
+	$movecomp = $checkedlistbox3.CheckedItems
+	foreach ($item in $movecomp)
+	{
+		Get-ADComputer $compname | Move-ADObject -TargetPath $item -Credential $getcreds
+	}
+	
+}
+
+$button4_Click={
+	$richtextbox6.Text = $null
+	$richtextbox8.Text = $null
+	for ($i = 0; $i -lt $checkedlistbox3.Items.Count; $i++) { $checkedlistbox3.SetItemChecked($i, $false) }
+	
+}
+
+$checkedlistbox1_SelectedIndexChanged={
+	#TODO: Place custom script here
+	
+}
+
+$buttonSearchPC_Click = {
+	$pcname = $textbox14.Text
+	#CHANGE SEARCHBASE
+	$pcsearch = Get-ADComputer -Filter * -SearchBase "OU=,DC=,DC=" -Properties * | Where { $_.Name -like "*$pcname*" } | Select Name, Description | Sort Name | Out-String
+	$richtextbox8.Text = $pcsearch
+}
